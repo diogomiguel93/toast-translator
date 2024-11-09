@@ -213,9 +213,9 @@ async def remove_duplicates(catalog) -> None:
         if 'kitsu' in item['id']:
             item['imdb_id'] = await kitsu.convert_to_imdb(item['id'], item['type'])
 
-        if item['imdb_id'] not in seen_ids:
+        if (c_index := item.get('imdb_id', item['id'])) not in seen_ids:
             unique_items.append(item)
-            seen_ids.add(item['imdb_id'])
+            seen_ids.add(c_index)
 
     catalog['metas'] = unique_items
 
