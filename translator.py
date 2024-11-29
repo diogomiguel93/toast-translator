@@ -35,7 +35,7 @@ def translate_catalog(original: dict, tmdb_meta: dict, skip_poster, toast_rating
             # Set poster if contend not have tmdb informations
             if toast_ratings == '1':
                 if 'tt' in tmdb_meta[i]['imdb_id']:
-                    item['poster'] = f'https://toastflix-ratings.hf.space/get_poster/{tmdb_meta[i]['imdb_id']}.jpg'
+                    item['poster'] = f"https://toastflix-ratings.hf.space/get_poster/{tmdb_meta[i]['imdb_id']}.jpg"
 
         else:
             try: item['name'] = detail['title'] if type == 'movie' else detail['name']
@@ -50,7 +50,7 @@ def translate_catalog(original: dict, tmdb_meta: dict, skip_poster, toast_rating
             if skip_poster == '0':
                 try: 
                     if toast_ratings == '1':
-                        item['poster'] = f'https://toastflix-ratings.hf.space/get_poster/{tmdb_meta[i]['imdb_id']}.jpg?tmdb_path={detail['poster_path']}&tmdb_rate={detail['vote_average']}'
+                        item['poster'] = f"https://toastflix-ratings.hf.space/get_poster/{tmdb_meta[i]['imdb_id']}.jpg?tmdb_path={detail['poster_path']}&tmdb_rate={detail['vote_average']}"
                     else:
                         item['poster'] = tmdb.TMDB_POSTER_URL + detail['poster_path']
                 except Exception as e: 
