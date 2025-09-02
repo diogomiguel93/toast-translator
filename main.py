@@ -148,12 +148,12 @@ async def get_catalog(response: Response, addon_url, type: str, user_settings: s
     addon_url = decode_base64_url(addon_url)
 
     async with httpx.AsyncClient(follow_redirects=True, timeout=REQUEST_TIMEOUT) as client:
-        response = await client.get(f"{addon_url}/catalog/{type}/{path}")
+        resp = await client.get(f"{addon_url}/catalog/{type}/{path}")
 
         try:
-            catalog = response.json()
+            catalog = resp.json()
         except:
-            print(response.text)
+            print(resp.text)
             return {}
 
         if 'metas' in catalog:
@@ -171,11 +171,10 @@ async def get_catalog(response: Response, addon_url, type: str, user_settings: s
 
 
 @app.get('/{addon_url}/{user_settings}/meta/{type}/{id}.json')
-async def get_meta(request: Request,response: Response, addon_url, type: str, id: str):
+async def get_meta(request: Request, response: Response, addon_url, type: str, id: str):
     headers = dict(request.headers)
     del headers['host']
     addon_url = decode_base64_url(addon_url)
-    global tmdb_addon_meta_url
     async with httpx.AsyncClient(follow_redirects=True, timeout=REQUEST_TIMEOUT) as client:
 
         # Get from cache
@@ -183,32 +182,41 @@ async def get_meta(request: Request,response: Response, addon_url, type: str, id
 
         # Return cached meta
         if meta != None:
-            return meta
+            return json_response(meta)
 
         # Not in cache
         else:
             # Handle imdb ids
             if 'tt' in id:
                 tmdb_id = await tmdb.convert_imdb_to_tmdb(id)
-                tasks = [
-                    client.get(f"{tmdb_addon_meta_url}/meta/{type}/{tmdb_id}.json"),
-                    client.get(f"{cinemeta_url}/meta/{type}/{id}.json")
-                ]
-                metas = await asyncio.gather(*tasks)
-                # TMDB addon retry and switch addon
-                for retry in range(6):
-                    if metas[0].status_code == 200:
-                        tmdb_meta = metas[0].json()
-                        break
-                    else:
-                        index = tmdb_addons_pool.index(tmdb_addon_meta_url)
-                        tmdb_addon_meta_url = tmdb_addons_pool[(index + 1) % len(tmdb_addons_pool)]
-                        metas[0] = await client.get(f"{tmdb_addon_meta_url}/meta/{type}/{tmdb_id}.json")
-                        if metas[0].status_code == 200:
-                            tmdb_meta = metas[0].json()
-                            break
-                
-                cinemeta_meta = metas[1].json()
+                # Try all TMDB addon candidates (per-request) and pick the best
+                async def get_best_tmdb_meta() -> dict:
+                    # Prefer current default first, then the rest
+                    ordered = [tmdb_addon_meta_url] + [u for u in tmdb_addons_pool if u != tmdb_addon_meta_url]
+                    best = {}
+                    best_len = -1
+                    for base in ordered:
+                        r = await client.get(f"{base}/meta/{type}/{tmdb_id}.json")
+                        if r.status_code != 200:
+                            continue
+                        try:
+                            m = r.json()
+                        except Exception:
+                            continue
+                        if not m or 'meta' not in m:
+                            continue
+                        # For series prefer longest videos list; for movies any valid
+                        if type == 'series':
+                            vlen = len(m['meta'].get('videos', []) or [])
+                            if vlen > best_len:
+                                best, best_len = m, vlen
+                        else:
+                            return m
+                    return best
+
+                tmdb_meta = await get_best_tmdb_meta()
+                cinemeta_resp = await client.get(f"{cinemeta_url}/meta/{type}/{id}.json")
+                cinemeta_meta = cinemeta_resp.json() if cinemeta_resp.status_code == 200 else {}
                 
                 # Not empty tmdb meta
                 if len(tmdb_meta.get('meta', [])) > 0:
@@ -233,7 +241,7 @@ async def get_meta(request: Request,response: Response, addon_url, type: str, id
                     else:
                         meta = tmdb_meta
 
-                # Empty tmdb_data
+                # Empty or weak tmdb_data
                 else:
                     if len(cinemeta_meta.get('meta', [])) > 0:
                         meta = cinemeta_meta
@@ -268,17 +276,18 @@ async def get_meta(request: Request,response: Response, addon_url, type: str, id
 
                 if is_converted:
                     tmdb_id = await tmdb.convert_imdb_to_tmdb(imdb_id)
-                    # TMDB Addons retry
-                    for retry in range(6):
-                        response = await client.get(f"{tmdb_addon_meta_url}/meta/{type}/{tmdb_id}.json")
-                        if response.status_code == 200:
-                            meta = response.json()
-                            break
-                        else:
-                            # Loop addon pool
-                            index = tmdb_addons_pool.index(tmdb_addon_meta_url)
-                            tmdb_addon_meta_url = tmdb_addons_pool[(index + 1) % len(tmdb_addons_pool)]
-                            print(f"Switch to {tmdb_addon_meta_url}")
+                    # Try all TMDB addon candidates (per-request)
+                    meta = {}
+                    ordered = [tmdb_addon_meta_url] + [u for u in tmdb_addons_pool if u != tmdb_addon_meta_url]
+                    for base in ordered:
+                        r = await client.get(f"{base}/meta/{type}/{tmdb_id}.json")
+                        if r.status_code == 200:
+                            try:
+                                meta = r.json()
+                            except Exception:
+                                meta = {}
+                            if meta:
+                                break
 
                     if len(meta['meta']) > 0:
                         if type == 'movie':
