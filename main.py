@@ -22,7 +22,7 @@ FORCE_META = False
 USE_TMDB_ID_META = True
 REQUEST_TIMEOUT = 120
 COMPATIBILITY_ID = ['tt', 'kitsu', 'mal']
-OFFICIAL_TMDB_ONLY = os.getenv('OFFICIAL_TMDB_ONLY', '0') == '1'
+OFFICIAL_TMDB_ONLY = os.getenv('OFFICIAL_TMDB_ONLY', '1') == '1'
 
 # Cache set
 meta_cache = Cache(maxsize=100000, ttl=timedelta(hours=12).total_seconds())
