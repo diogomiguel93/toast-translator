@@ -220,6 +220,37 @@ async def get_meta(request: Request, response: Response, addon_url, type: str, i
                 
                 # Not empty tmdb meta
                 if len(tmdb_meta.get('meta', [])) > 0:
+                    # If series, try to augment episodes for the highest season using TMDB direct season API
+                    if type == 'series':
+                        try:
+                            # Determine highest season present
+                            videos = tmdb_meta['meta'].get('videos', []) or []
+                            if videos:
+                                highest_season = max(v.get('season', 0) for v in videos)
+                                # Fetch season episodes directly from TMDB (it-IT)
+                                season_data = await tmdb.get_tv_season(client, tmdb_id, highest_season, language='it-IT')
+                                tmdb_eps = season_data.get('episodes', [])
+                                # Build a set of existing (season, episode) to avoid duplicates
+                                existing = {(v.get('season'), v.get('episode')) for v in videos}
+                                new_eps = []
+                                for e in tmdb_eps:
+                                    key = (highest_season, e.get('episode_number'))
+                                    if key in existing:
+                                        continue
+                                    base_imdb = tmdb_meta['meta'].get('imdb_id', id)
+                                    new_eps.append({
+                                        'id': f"{base_imdb}:{highest_season}:{e.get('episode_number')}",
+                                        'season': highest_season,
+                                        'episode': e.get('episode_number'),
+                                        'name': e.get('name'),
+                                        'overview': e.get('overview'),
+                                        'thumbnail': (tmdb.TMDB_BACK_URL + e['still_path']) if e.get('still_path') else None
+                                    })
+                                if new_eps:
+                                    tmdb_meta['meta']['videos'].extend(new_eps)
+                        except Exception as _e:
+                            # Non-bloccante: in caso di errori, proseguiamo con i dati disponibili
+                            pass
                     # Not merge anime
                     if id not in kitsu.imdb_ids_map:
                         tasks = []
