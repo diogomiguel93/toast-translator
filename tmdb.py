@@ -76,3 +76,32 @@ def get_id(tmdb_data: dict) -> str:
         return tmdb_data['imdb_id']
     else:
         return f"tmdb:{id}"
+
+
+# Fetch TV season details (episodes) from TMDB
+async def get_tv_season(client: httpx.AsyncClient, series_tmdb_id: int | str, season_number: int, language: str = "it-IT") -> dict:
+    sid = str(series_tmdb_id).replace("tmdb:", "")
+    cache_key = f"tv:{sid}:season:{season_number}:{language}"
+
+    item = tmp_cache.get(cache_key)
+    if item is not None:
+        return item
+
+    params = {
+        "language": language,
+        "api_key": TMDB_API_KEY
+    }
+    url = f"https://api.themoviedb.org/3/tv/{sid}/season/{season_number}"
+
+    # Reuse fetch_and_retry with minor wrapping
+    headers = {"accept": "application/json"}
+    for attempt in range(1, 6):
+        response = await client.get(url, headers=headers, params=params)
+        if response.status_code == 200:
+            data = response.json()
+            tmp_cache.set(cache_key, data)
+            return data
+        elif response.status_code == 429:
+            await asyncio.sleep(attempt * 2)
+
+    return {}
