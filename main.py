@@ -22,6 +22,7 @@ FORCE_META = False
 USE_TMDB_ID_META = True
 REQUEST_TIMEOUT = 120
 COMPATIBILITY_ID = ['tt', 'kitsu', 'mal']
+OFFICIAL_TMDB_ONLY = os.getenv('OFFICIAL_TMDB_ONLY', '0') == '1'
 
 # Cache set
 meta_cache = Cache(maxsize=100000, ttl=timedelta(hours=12).total_seconds())
@@ -220,34 +221,67 @@ async def get_meta(request: Request, response: Response, addon_url, type: str, i
                 
                 # Not empty tmdb meta
                 if len(tmdb_meta.get('meta', [])) > 0:
-                    # If series, try to augment episodes for the highest season using TMDB direct season API
+                    # If series, enrich/replace episodes using TMDB official API (it-IT)
                     if type == 'series':
                         try:
-                            # Determine highest season present
                             videos = tmdb_meta['meta'].get('videos', []) or []
-                            if videos:
-                                highest_season = max(v.get('season', 0) for v in videos)
-                                # Fetch season episodes directly from TMDB (it-IT)
-                                season_data = await tmdb.get_tv_season(client, tmdb_id, highest_season, language='it-IT')
-                                tmdb_eps = season_data.get('episodes', [])
-                                # Build a set of existing (season, episode) to avoid duplicates
-                                existing = {(v.get('season'), v.get('episode')) for v in videos}
-                                new_eps = []
-                                for e in tmdb_eps:
-                                    key = (highest_season, e.get('episode_number'))
-                                    if key in existing:
-                                        continue
-                                    base_imdb = tmdb_meta['meta'].get('imdb_id', id)
-                                    new_eps.append({
-                                        'id': f"{base_imdb}:{highest_season}:{e.get('episode_number')}",
-                                        'season': highest_season,
-                                        'episode': e.get('episode_number'),
-                                        'name': e.get('name'),
-                                        'overview': e.get('overview'),
-                                        'thumbnail': (tmdb.TMDB_BACK_URL + e['still_path']) if e.get('still_path') else None
-                                    })
-                                if new_eps:
-                                    tmdb_meta['meta']['videos'].extend(new_eps)
+                            base_imdb = tmdb_meta['meta'].get('imdb_id', id)
+                            def to_iso_z(d: str | None) -> str | None:
+                                if not d:
+                                    return None
+                                return f"{d}T00:00:00.000Z"
+
+                            if OFFICIAL_TMDB_ONLY:
+                                # Build ALL seasons from official TMDB API
+                                details = await tmdb.get_tv_details(client, tmdb_id, language='it-IT')
+                                seasons = [s.get('season_number') for s in (details.get('seasons') or []) if s.get('season_number') and s.get('season_number') > 0]
+                                # Fetch all seasons in parallel
+                                tasks = [tmdb.get_tv_season(client, tmdb_id, sn, language='it-IT') for sn in seasons]
+                                seasons_data = await asyncio.gather(*tasks)
+                                rebuilt_all = []
+                                for sdata in seasons_data:
+                                    sn = sdata.get('season_number')
+                                    for e in sdata.get('episodes', []) or []:
+                                        rebuilt_all.append({
+                                            'id': f"{base_imdb}:{sn}:{e.get('episode_number')}",
+                                            'season': sn,
+                                            'episode': e.get('episode_number'),
+                                            'name': e.get('name'),
+                                            'overview': e.get('overview'),
+                                            'description': e.get('overview'),
+                                            'thumbnail': (tmdb.TMDB_BACK_URL + e['still_path']) if e.get('still_path') else None,
+                                            'firstAired': to_iso_z(e.get('air_date')),
+                                            'released': to_iso_z(e.get('air_date')),
+                                            'rating': e.get('vote_average')
+                                        })
+                                # Stable sort by season then episode
+                                tmdb_meta['meta']['videos'] = sorted(rebuilt_all, key=lambda v: (v.get('season', 0), v.get('episode', 0)))
+                            else:
+                                # Augment only highest season
+                                if videos:
+                                    highest_season = max(v.get('season', 0) for v in videos)
+                                    season_data = await tmdb.get_tv_season(client, tmdb_id, highest_season, language='it-IT')
+                                    tmdb_eps = season_data.get('episodes', [])
+                                    existing = {(v.get('season'), v.get('episode')) for v in videos}
+                                    new_eps = []
+                                    for e in tmdb_eps:
+                                        key = (highest_season, e.get('episode_number'))
+                                        if key in existing:
+                                            continue
+                                        new_eps.append({
+                                            'id': f"{base_imdb}:{highest_season}:{e.get('episode_number')}",
+                                            'season': highest_season,
+                                            'episode': e.get('episode_number'),
+                                            'name': e.get('name'),
+                                            'overview': e.get('overview'),
+                                            'description': e.get('overview'),
+                                            'thumbnail': (tmdb.TMDB_BACK_URL + e['still_path']) if e.get('still_path') else None,
+                                            'firstAired': to_iso_z(e.get('air_date')),
+                                            'released': to_iso_z(e.get('air_date')),
+                                            'rating': e.get('vote_average')
+                                        })
+                                    if new_eps:
+                                        tmdb_meta['meta']['videos'].extend(new_eps)
                         except Exception as _e:
                             # Non-bloccante: in caso di errori, proseguiamo con i dati disponibili
                             pass
