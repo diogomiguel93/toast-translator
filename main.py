@@ -198,6 +198,7 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
                         tmdb_id = await tmdb.convert_imdb_to_tmdb(id, preferred_type=preferred, bypass_cache=True)
                         if type == 'series':
                             details = await tmdb.get_tv_details(client, tmdb_id, language='it-IT')
+                            images = await tmdb.get_tv_images(client, tmdb_id)
                             seasons = sorted([s.get('season_number') for s in (details.get('seasons') or []) if s.get('season_number') and s.get('season_number') > 0])
                             # Carica tutte le stagioni per allinearsi al comportamento precedente degli addon TMDB
                             tasks = [tmdb.get_tv_season(client, tmdb_id, sn, language='it-IT') for sn in seasons]
@@ -247,12 +248,17 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
                                 meta_obj['meta']['name'] = series_name
                             if details.get('overview'):
                                 meta_obj['meta']['description'] = details.get('overview')
+                            # fill only logo from TMDB images; no poster forcing
+                            l_path, _ = tmdb.pick_best_logo(images)
+                            if l_path:
+                                meta_obj['meta']['logo'] = (tmdb.TMDB_BACK_URL + l_path)
                             if upcoming_count > 0:
                                 meta_obj['meta'].setdefault('behaviorHints', {})
                                 meta_obj['meta']['behaviorHints']['hasScheduledVideos'] = True
                             return meta_obj
                         else:
                             movie_details = await tmdb.get_movie_details(client, tmdb_id, language='it-IT')
+                            movie_images = await tmdb.get_movie_images(client, tmdb_id)
                             def to_iso_z(d):
                                 return f"{d}T00:00:00.000Z" if d else None
                             meta_obj = {
@@ -268,6 +274,10 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
                                 meta_obj['meta']['name'] = movie_name
                             if movie_details.get('overview'):
                                 meta_obj['meta']['description'] = movie_details.get('overview')
+                            # fill only logo from TMDB images; no poster forcing
+                            l_path, _ = tmdb.pick_best_logo(movie_images)
+                            if l_path:
+                                meta_obj['meta']['logo'] = (tmdb.TMDB_BACK_URL + l_path)
                             if movie_details.get('release_date'):
                                 meta_obj['meta']['released'] = to_iso_z(movie_details.get('release_date'))
                                 meta_obj['meta']['firstAired'] = to_iso_z(movie_details.get('release_date'))
@@ -407,6 +417,7 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
                         tmdb_id = await tmdb.convert_imdb_to_tmdb(imdb_id, preferred_type=preferred, bypass_cache=True)
                         if type == 'series':
                             details = await tmdb.get_tv_details(client, tmdb_id, language='it-IT')
+                            images = await tmdb.get_tv_images(client, tmdb_id)
                             seasons = sorted([s.get('season_number') for s in (details.get('seasons') or []) if s.get('season_number') and s.get('season_number') > 0])
                             tasks = [tmdb.get_tv_season(client, tmdb_id, sn, language='it-IT') for sn in seasons]
                             seasons_data = await asyncio.gather(*tasks)
@@ -454,12 +465,20 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
                                 meta_obj['meta']['name'] = series_name
                             if details.get('overview'):
                                 meta_obj['meta']['description'] = details.get('overview')
+                            # Anime: fill background and logo from TMDB images
+                            b_path, _ = tmdb.pick_best_backdrop(images)
+                            if b_path:
+                                meta_obj['meta']['background'] = (tmdb.TMDB_BACK_URL + b_path)
+                            l_path, _ = tmdb.pick_best_logo(images)
+                            if l_path:
+                                meta_obj['meta']['logo'] = (tmdb.TMDB_BACK_URL + l_path)
                             if upcoming_count > 0:
                                 meta_obj['meta'].setdefault('behaviorHints', {})
                                 meta_obj['meta']['behaviorHints']['hasScheduledVideos'] = True
                             meta = meta_obj
                         else:
                             movie_details = await tmdb.get_movie_details(client, tmdb_id, language='it-IT')
+                            movie_images = await tmdb.get_movie_images(client, tmdb_id)
                             def to_iso_z(d):
                                 return f"{d}T00:00:00.000Z" if d else None
                             meta_obj = {
@@ -475,6 +494,13 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
                                 meta_obj['meta']['name'] = movie_name
                             if movie_details.get('overview'):
                                 meta_obj['meta']['description'] = movie_details.get('overview')
+                            # Anime movie: fill background and logo from TMDB images
+                            b_path, _ = tmdb.pick_best_backdrop(movie_images)
+                            if b_path:
+                                meta_obj['meta']['background'] = (tmdb.TMDB_BACK_URL + b_path)
+                            l_path, _ = tmdb.pick_best_logo(movie_images)
+                            if l_path:
+                                meta_obj['meta']['logo'] = (tmdb.TMDB_BACK_URL + l_path)
                             if movie_details.get('release_date'):
                                 meta_obj['meta']['released'] = to_iso_z(movie_details.get('release_date'))
                                 meta_obj['meta']['firstAired'] = to_iso_z(movie_details.get('release_date'))
