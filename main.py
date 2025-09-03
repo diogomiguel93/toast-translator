@@ -16,7 +16,7 @@ import base64
 import os
 
 # Settings
-translator_version = 'v0.1.0'
+translator_version = 'v0.0.9'
 FORCE_PREFIX = False
 FORCE_META = False
 USE_TMDB_ID_META = True
@@ -230,8 +230,10 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
                                         'rating': e.get('vote_average')
                                     }
                                     if e.get('air_date') and is_future(e.get('air_date')):
+                                        # Etichetta in italiano per il badge
                                         v['releaseInfo'] = 'Prossimamente'
                                         upcoming_count += 1
+                                        print(f"[META][UPCOMING] {id} S{sn:02d}E{e.get('episode_number')} -> {e.get('air_date')}")
                                     videos.append(v)
 
                             # Costruisci meta includendo solo i campi valorizzati per non sovrascrivere Cinemeta con vuoti
@@ -248,13 +250,23 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
                                 meta_obj['meta']['name'] = series_name
                             if details.get('overview'):
                                 meta_obj['meta']['description'] = details.get('overview')
-                            # fill only logo from TMDB images; no poster forcing
-                            l_path, _ = tmdb.pick_best_logo(images)
+                            # immagini: preferisci italiane
+                            p_path, p_lang = tmdb.pick_best_poster(images)
+                            b_path, b_lang = tmdb.pick_best_backdrop(images)
+                            if p_path:
+                                meta_obj['meta']['poster'] = (tmdb.TMDB_POSTER_URL + p_path)
+                            if b_path:
+                                meta_obj['meta']['background'] = (tmdb.TMDB_BACK_URL + b_path)
+                            # logo
+                            l_path, l_lang = tmdb.pick_best_logo(images)
                             if l_path:
                                 meta_obj['meta']['logo'] = (tmdb.TMDB_BACK_URL + l_path)
+                            print(f"[META][IMG] {id} chosen poster_lang={p_lang} backdrop_lang={b_lang}")
                             if upcoming_count > 0:
                                 meta_obj['meta'].setdefault('behaviorHints', {})
                                 meta_obj['meta']['behaviorHints']['hasScheduledVideos'] = True
+                                print(f"[META][UPCOMING][FLAG] hasScheduledVideos=True for {id}")
+                            print(f"[META][TMDB-OFFICIAL] Series {id}: seasons={len(seasons)} episodes={len(videos)} upcoming={upcoming_count}")
                             return meta_obj
                         else:
                             movie_details = await tmdb.get_movie_details(client, tmdb_id, language='it-IT')
@@ -274,13 +286,20 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
                                 meta_obj['meta']['name'] = movie_name
                             if movie_details.get('overview'):
                                 meta_obj['meta']['description'] = movie_details.get('overview')
-                            # fill only logo from TMDB images; no poster forcing
-                            l_path, _ = tmdb.pick_best_logo(movie_images)
+                            p_path, p_lang = tmdb.pick_best_poster(movie_images)
+                            b_path, b_lang = tmdb.pick_best_backdrop(movie_images)
+                            if p_path:
+                                meta_obj['meta']['poster'] = (tmdb.TMDB_POSTER_URL + p_path)
+                            if b_path:
+                                meta_obj['meta']['background'] = (tmdb.TMDB_BACK_URL + b_path)
+                            l_path, l_lang = tmdb.pick_best_logo(movie_images)
                             if l_path:
                                 meta_obj['meta']['logo'] = (tmdb.TMDB_BACK_URL + l_path)
+                            print(f"[META][IMG] {id} chosen poster_lang={p_lang} backdrop_lang={b_lang}")
                             if movie_details.get('release_date'):
                                 meta_obj['meta']['released'] = to_iso_z(movie_details.get('release_date'))
                                 meta_obj['meta']['firstAired'] = to_iso_z(movie_details.get('release_date'))
+                            print(f"[META][TMDB-OFFICIAL] Movie {id}: poster={'ok' if meta_obj['meta'].get('poster') else 'no'} background={'ok' if meta_obj['meta'].get('background') else 'no'}")
                             return meta_obj
                     except Exception:
                         print(f"[META][TMDB-OFFICIAL] Failed for {id}")
@@ -339,7 +358,21 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
                     if id not in kitsu.imdb_ids_map:
                         tasks = []
                         meta, merged_videos = meta_merger.merge(tmdb_meta, cinemeta_meta)
-                        # No forced name override; merge handles fields
+                        # Log sorgente poster/background
+                        try:
+                            tmdb_has_poster = bool(tmdb_meta.get('meta', {}).get('poster'))
+                            cm_has_poster = bool((cinemeta_meta.get('meta') or {}).get('poster'))
+                            poster_src = 'TMDB' if tmdb_has_poster else ('Cinemeta' if cm_has_poster else 'none')
+                            tmdb_has_bg = bool(tmdb_meta.get('meta', {}).get('background'))
+                            cm_has_bg = bool((cinemeta_meta.get('meta') or {}).get('background'))
+                            bg_src = 'TMDB' if tmdb_has_bg else ('Cinemeta' if cm_has_bg else 'none')
+                            print(f"[META][IMG] {id} poster={poster_src} background={bg_src}")
+                        except Exception:
+                            pass
+                        # Assicura che il titolo italiano da TMDB prevalga sul titolo di Cinemeta
+                        tmdb_name = tmdb_meta['meta'].get('name')
+                        if tmdb_name:
+                            meta['meta']['name'] = tmdb_name
                         tmdb_description = tmdb_meta['meta'].get('description', '')
                         
                         if tmdb_description == '':
@@ -362,6 +395,7 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
                             if u > 0:
                                 meta['meta'].setdefault('behaviorHints', {})
                                 meta['meta']['behaviorHints']['hasScheduledVideos'] = True
+                                print(f"[META][UPCOMING][FLAG] hasScheduledVideos=True for {id} (merged)")
                     else:
                         meta = tmdb_meta
 
@@ -388,7 +422,7 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
                             if u > 0:
                                 meta['meta'].setdefault('behaviorHints', {})
                                 meta['meta']['behaviorHints']['hasScheduledVideos'] = True
-                                pass
+                                print(f"[META][UPCOMING][FLAG] hasScheduledVideos=True for {id} (cinemeta)")
 
                         elif type == 'movie':
                             if description:
@@ -450,6 +484,7 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
                                     if e.get('air_date') and is_future(e.get('air_date')):
                                         v['releaseInfo'] = 'Prossimamente'
                                         upcoming_count += 1
+                                        print(f"[META][UPCOMING] {imdb_id} S{sn:02d}E{e.get('episode_number')} -> {e.get('air_date')}")
                                     videos.append(v)
 
                             meta_obj = {
@@ -465,16 +500,21 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
                                 meta_obj['meta']['name'] = series_name
                             if details.get('overview'):
                                 meta_obj['meta']['description'] = details.get('overview')
-                            # Anime: fill background and logo from TMDB images
-                            b_path, _ = tmdb.pick_best_backdrop(images)
+                            p_path, p_lang = tmdb.pick_best_poster(images)
+                            b_path, b_lang = tmdb.pick_best_backdrop(images)
+                            if p_path:
+                                meta_obj['meta']['poster'] = (tmdb.TMDB_POSTER_URL + p_path)
                             if b_path:
                                 meta_obj['meta']['background'] = (tmdb.TMDB_BACK_URL + b_path)
-                            l_path, _ = tmdb.pick_best_logo(images)
+                            l_path, l_lang = tmdb.pick_best_logo(images)
                             if l_path:
                                 meta_obj['meta']['logo'] = (tmdb.TMDB_BACK_URL + l_path)
+                            print(f"[META][IMG] {imdb_id} chosen poster_lang={p_lang} backdrop_lang={b_lang}")
                             if upcoming_count > 0:
                                 meta_obj['meta'].setdefault('behaviorHints', {})
                                 meta_obj['meta']['behaviorHints']['hasScheduledVideos'] = True
+                                print(f"[META][UPCOMING][FLAG] hasScheduledVideos=True for {imdb_id}")
+                            print(f"[META][TMDB-OFFICIAL] Anime series {imdb_id}: episodes={len(videos)} upcoming={upcoming_count}")
                             meta = meta_obj
                         else:
                             movie_details = await tmdb.get_movie_details(client, tmdb_id, language='it-IT')
@@ -494,16 +534,20 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
                                 meta_obj['meta']['name'] = movie_name
                             if movie_details.get('overview'):
                                 meta_obj['meta']['description'] = movie_details.get('overview')
-                            # Anime movie: fill background and logo from TMDB images
-                            b_path, _ = tmdb.pick_best_backdrop(movie_images)
+                            p_path, p_lang = tmdb.pick_best_poster(movie_images)
+                            b_path, b_lang = tmdb.pick_best_backdrop(movie_images)
+                            if p_path:
+                                meta_obj['meta']['poster'] = (tmdb.TMDB_POSTER_URL + p_path)
                             if b_path:
                                 meta_obj['meta']['background'] = (tmdb.TMDB_BACK_URL + b_path)
-                            l_path, _ = tmdb.pick_best_logo(movie_images)
+                            l_path, l_lang = tmdb.pick_best_logo(movie_images)
                             if l_path:
                                 meta_obj['meta']['logo'] = (tmdb.TMDB_BACK_URL + l_path)
+                            print(f"[META][IMG] {imdb_id} chosen poster_lang={p_lang} backdrop_lang={b_lang}")
                             if movie_details.get('release_date'):
                                 meta_obj['meta']['released'] = to_iso_z(movie_details.get('release_date'))
                                 meta_obj['meta']['firstAired'] = to_iso_z(movie_details.get('release_date'))
+                            print(f"[META][TMDB-OFFICIAL] Anime movie {imdb_id}: poster={'ok' if meta_obj['meta'].get('poster') else 'no'} background={'ok' if meta_obj['meta'].get('background') else 'no'}")
                             meta = meta_obj
                     except Exception:
                         meta = {}
@@ -539,11 +583,27 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
                         elif type == 'series':
                             videos = kitsu.parse_meta_videos(meta['meta'].get('videos', []), imdb_id)
                             meta['meta']['videos'] = videos
+                        # Ensure upcoming flags present for anime series too
                         if type == 'series':
                             u = _mark_upcoming(meta['meta'].get('videos', []))
                             if u > 0:
                                 meta['meta'].setdefault('behaviorHints', {})
                                 meta['meta']['behaviorHints']['hasScheduledVideos'] = True
+                                print(f"[META][UPCOMING][FLAG] hasScheduledVideos=True for {id} (anime)")
+                    # Fallback immagini per anime: se mancano poster/background, prova da Cinemeta (IMDb)
+                    try:
+                        if imdb_id and (not meta['meta'].get('poster') or not meta['meta'].get('background')):
+                            cm_resp = await client.get(f"{cinemeta_url}/meta/{type}/{imdb_id}.json")
+                            if cm_resp.status_code == 200:
+                                cm = cm_resp.json()
+                                if not meta['meta'].get('poster') and (cm.get('meta') or {}).get('poster'):
+                                    meta['meta']['poster'] = cm['meta']['poster']
+                                    print(f"[META][IMG][FALLBACK] Poster from Cinemeta for {imdb_id}")
+                                if not meta['meta'].get('background') and (cm.get('meta') or {}).get('background'):
+                                    meta['meta']['background'] = cm['meta']['background']
+                                    print(f"[META][IMG][FALLBACK] Background from Cinemeta for {imdb_id}")
+                    except Exception:
+                        pass
                 else:
                     # Get meta from kitsu addon if conversion failed
                     response = await client.get(f"{kitsu.kitsu_addon_url}/meta/{type}/{id.replace(':','%3A')}.json")
@@ -555,7 +615,40 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
 
 
             meta['meta']['id'] = id
-            # Remove generic image fallback and Toast Ratings poster forcing
+
+            # Fallback immagini generale: se mancano poster/background, prova da Cinemeta
+            try:
+                imdb_for_cm = meta['meta'].get('imdb_id') or (id if id.startswith('tt') else None)
+                need_poster = not meta['meta'].get('poster')
+                need_bg = not meta['meta'].get('background')
+                if imdb_for_cm and (need_poster or need_bg):
+                    cm_source = None
+                    if 'cinemeta_meta' in locals() and cinemeta_meta:
+                        cm_source = cinemeta_meta
+                    else:
+                        r = await client.get(f"{cinemeta_url}/meta/{type}/{imdb_for_cm}.json")
+                        if r.status_code == 200:
+                            cm_source = r.json()
+                    if cm_source and cm_source.get('meta'):
+                        if need_poster and cm_source['meta'].get('poster'):
+                            meta['meta']['poster'] = cm_source['meta']['poster']
+                            print(f"[META][IMG][FALLBACK] Poster from Cinemeta for {imdb_for_cm}")
+                        if need_bg and cm_source['meta'].get('background'):
+                            meta['meta']['background'] = cm_source['meta']['background']
+                            print(f"[META][IMG][FALLBACK] Background from Cinemeta for {imdb_for_cm}")
+            except Exception:
+                pass
+
+            # Poster: mantieni quello TMDB nel dettaglio; usa Toast Ratings solo come fallback se mancante
+            try:
+                if settings.get('sp', '0') == '0':
+                    imdb_val = meta['meta'].get('imdb_id') or (id if id.startswith('tt') else None)
+                    if imdb_val and settings.get('tr', '0') == '1':
+                        if not meta['meta'].get('poster'):
+                            meta['meta']['poster'] = f"{translator.RATINGS_SERVER}/{type}/get_poster/{imdb_val}.jpg"
+                            print(f"[META][IMG][TOAST] Poster from Toast Ratings for {imdb_val}")
+            except Exception:
+                pass
             meta_cache.set(id, meta)
             return json_response(meta)
 
