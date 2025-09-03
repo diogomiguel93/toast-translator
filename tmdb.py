@@ -7,8 +7,8 @@ import asyncio
 #from dotenv import load_dotenv
 #load_dotenv()
 
-# Keep legacy sizes (optional, as images are not forced in detail paths)
-TMDB_POSTER_URL = 'https://image.tmdb.org/t/p/w500'
+# Prefer original size for posters to preserve quality and match addon behavior
+TMDB_POSTER_URL = 'https://image.tmdb.org/t/p/original'
 TMDB_BACK_URL = 'https://image.tmdb.org/t/p/original'
 TMDB_API_KEY = os.getenv('TMDB_API_KEY')
 
@@ -124,7 +124,7 @@ async def get_movie_details(client: httpx.AsyncClient, movie_tmdb_id: str | int,
     return await fetch_and_retry(client, f"tmdb:movie:{tmdb_numeric}", url, params)
 
 
-# ---------- Minimal image helpers (backdrop + logo only) ----------
+# ---------- Images (prefer Italian) ----------
 
 async def get_tv_images(client: httpx.AsyncClient, series_tmdb_id: str | int, include_image_language: str = 'it,it-IT,null,en') -> dict:
     tmdb_numeric = _strip_tmdb_prefix(series_tmdb_id)
@@ -143,12 +143,19 @@ async def get_movie_images(client: httpx.AsyncClient, movie_tmdb_id: str | int, 
 def _pick_image_path(items: list, prefer_langs: list[str]) -> tuple[str | None, str | None]:
     if not items:
         return None, None
+    # try preferred languages in order
     for lang in prefer_langs:
         for it in items:
             iso = it.get('iso_639_1')
             if (lang is None and iso is None) or (lang and iso and iso.lower() == lang.lower()):
                 return it.get('file_path'), iso
+    # fallback first
     return items[0].get('file_path'), items[0].get('iso_639_1')
+
+
+def pick_best_poster(images: dict, prefer_langs: list[str] = ['it', 'it-IT', None, 'en', '']) -> tuple[str | None, str | None]:
+    posters = (images or {}).get('posters') or []
+    return _pick_image_path(posters, prefer_langs)
 
 
 def pick_best_backdrop(images: dict, prefer_langs: list[str] = ['it', 'it-IT', None, 'en', '']) -> tuple[str | None, str | None]:
