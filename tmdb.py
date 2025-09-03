@@ -124,4 +124,38 @@ async def get_movie_details(client: httpx.AsyncClient, movie_tmdb_id: str | int,
     return await fetch_and_retry(client, f"tmdb:movie:{tmdb_numeric}", url, params)
 
 
-# Image helpers removed; images handled by source add-ons or Cinemeta
+# ---------- Minimal image helpers (backdrop + logo only) ----------
+
+async def get_tv_images(client: httpx.AsyncClient, series_tmdb_id: str | int, include_image_language: str = 'it,it-IT,null,en') -> dict:
+    tmdb_numeric = _strip_tmdb_prefix(series_tmdb_id)
+    url = f"https://api.themoviedb.org/3/tv/{tmdb_numeric}/images"
+    params = {"include_image_language": include_image_language, "api_key": TMDB_API_KEY}
+    return await fetch_and_retry(client, f"tmdb:tv:{tmdb_numeric}:images", url, params)
+
+
+async def get_movie_images(client: httpx.AsyncClient, movie_tmdb_id: str | int, include_image_language: str = 'it,it-IT,null,en') -> dict:
+    tmdb_numeric = _strip_tmdb_prefix(movie_tmdb_id)
+    url = f"https://api.themoviedb.org/3/movie/{tmdb_numeric}/images"
+    params = {"include_image_language": include_image_language, "api_key": TMDB_API_KEY}
+    return await fetch_and_retry(client, f"tmdb:movie:{tmdb_numeric}:images", url, params)
+
+
+def _pick_image_path(items: list, prefer_langs: list[str]) -> tuple[str | None, str | None]:
+    if not items:
+        return None, None
+    for lang in prefer_langs:
+        for it in items:
+            iso = it.get('iso_639_1')
+            if (lang is None and iso is None) or (lang and iso and iso.lower() == lang.lower()):
+                return it.get('file_path'), iso
+    return items[0].get('file_path'), items[0].get('iso_639_1')
+
+
+def pick_best_backdrop(images: dict, prefer_langs: list[str] = ['it', 'it-IT', None, 'en', '']) -> tuple[str | None, str | None]:
+    backdrops = (images or {}).get('backdrops') or []
+    return _pick_image_path(backdrops, prefer_langs)
+
+
+def pick_best_logo(images: dict, prefer_langs: list[str] = ['it', 'it-IT', None, 'en', '']) -> tuple[str | None, str | None]:
+    logos = (images or {}).get('logos') or []
+    return _pick_image_path(logos, prefer_langs)
