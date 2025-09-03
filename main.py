@@ -261,6 +261,21 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
                             l_path, l_lang = tmdb.pick_best_logo(images)
                             if l_path:
                                 meta_obj['meta']['logo'] = (tmdb.TMDB_BACK_URL + l_path)
+                            # EN images fallback if any missing
+                            if not meta_obj['meta'].get('poster') or not meta_obj['meta'].get('background') or not meta_obj['meta'].get('logo'):
+                                images_en = await tmdb.get_tv_images(client, tmdb_id, include_image_language='en,en-EN,null,en')
+                                if not meta_obj['meta'].get('poster'):
+                                    p2, _ = tmdb.pick_best_poster(images_en)
+                                    if p2:
+                                        meta_obj['meta']['poster'] = (tmdb.TMDB_POSTER_URL + p2)
+                                if not meta_obj['meta'].get('background'):
+                                    b2, _ = tmdb.pick_best_backdrop(images_en)
+                                    if b2:
+                                        meta_obj['meta']['background'] = (tmdb.TMDB_BACK_URL + b2)
+                                if not meta_obj['meta'].get('logo'):
+                                    l2, _ = tmdb.pick_best_logo(images_en)
+                                    if l2:
+                                        meta_obj['meta']['logo'] = (tmdb.TMDB_BACK_URL + l2)
                             print(f"[META][IMG] {id} chosen poster_lang={p_lang} backdrop_lang={b_lang}")
                             if upcoming_count > 0:
                                 meta_obj['meta'].setdefault('behaviorHints', {})
@@ -295,6 +310,21 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
                             l_path, l_lang = tmdb.pick_best_logo(movie_images)
                             if l_path:
                                 meta_obj['meta']['logo'] = (tmdb.TMDB_BACK_URL + l_path)
+                            # EN images fallback if any missing
+                            if not meta_obj['meta'].get('poster') or not meta_obj['meta'].get('background') or not meta_obj['meta'].get('logo'):
+                                movie_images_en = await tmdb.get_movie_images(client, tmdb_id, include_image_language='en,en-EN,null,en')
+                                if not meta_obj['meta'].get('poster'):
+                                    p2, _ = tmdb.pick_best_poster(movie_images_en)
+                                    if p2:
+                                        meta_obj['meta']['poster'] = (tmdb.TMDB_POSTER_URL + p2)
+                                if not meta_obj['meta'].get('background'):
+                                    b2, _ = tmdb.pick_best_backdrop(movie_images_en)
+                                    if b2:
+                                        meta_obj['meta']['background'] = (tmdb.TMDB_BACK_URL + b2)
+                                if not meta_obj['meta'].get('logo'):
+                                    l2, _ = tmdb.pick_best_logo(movie_images_en)
+                                    if l2:
+                                        meta_obj['meta']['logo'] = (tmdb.TMDB_BACK_URL + l2)
                             print(f"[META][IMG] {id} chosen poster_lang={p_lang} backdrop_lang={b_lang}")
                             if movie_details.get('release_date'):
                                 meta_obj['meta']['released'] = to_iso_z(movie_details.get('release_date'))
@@ -398,6 +428,13 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
                                 print(f"[META][UPCOMING][FLAG] hasScheduledVideos=True for {id} (merged)")
                     else:
                         meta = tmdb_meta
+                        # Anime: fallback al logo da Cinemeta se TMDB non lo fornisce
+                        try:
+                            if not meta['meta'].get('logo') and (cinemeta_meta.get('meta') or {}).get('logo'):
+                                meta['meta']['logo'] = cinemeta_meta['meta']['logo']
+                                print(f"[META][IMG][FALLBACK] Logo from Cinemeta for {id}")
+                        except Exception:
+                            pass
 
                 # Empty tmdb_data
                 else:
@@ -509,6 +546,21 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
                             l_path, l_lang = tmdb.pick_best_logo(images)
                             if l_path:
                                 meta_obj['meta']['logo'] = (tmdb.TMDB_BACK_URL + l_path)
+                            # EN images fallback if any missing
+                            if not meta_obj['meta'].get('poster') or not meta_obj['meta'].get('background') or not meta_obj['meta'].get('logo'):
+                                images_en = await tmdb.get_tv_images(client, tmdb_id, include_image_language='en,en-EN,null,en')
+                                if not meta_obj['meta'].get('poster'):
+                                    p2, _ = tmdb.pick_best_poster(images_en)
+                                    if p2:
+                                        meta_obj['meta']['poster'] = (tmdb.TMDB_POSTER_URL + p2)
+                                if not meta_obj['meta'].get('background'):
+                                    b2, _ = tmdb.pick_best_backdrop(images_en)
+                                    if b2:
+                                        meta_obj['meta']['background'] = (tmdb.TMDB_BACK_URL + b2)
+                                if not meta_obj['meta'].get('logo'):
+                                    l2, _ = tmdb.pick_best_logo(images_en)
+                                    if l2:
+                                        meta_obj['meta']['logo'] = (tmdb.TMDB_BACK_URL + l2)
                             print(f"[META][IMG] {imdb_id} chosen poster_lang={p_lang} backdrop_lang={b_lang}")
                             if upcoming_count > 0:
                                 meta_obj['meta'].setdefault('behaviorHints', {})
@@ -543,6 +595,21 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
                             l_path, l_lang = tmdb.pick_best_logo(movie_images)
                             if l_path:
                                 meta_obj['meta']['logo'] = (tmdb.TMDB_BACK_URL + l_path)
+                            # EN images fallback if any missing
+                            if not meta_obj['meta'].get('poster') or not meta_obj['meta'].get('background') or not meta_obj['meta'].get('logo'):
+                                movie_images_en = await tmdb.get_movie_images(client, tmdb_id, include_image_language='en,en-EN,null,en')
+                                if not meta_obj['meta'].get('poster'):
+                                    p2, _ = tmdb.pick_best_poster(movie_images_en)
+                                    if p2:
+                                        meta_obj['meta']['poster'] = (tmdb.TMDB_POSTER_URL + p2)
+                                if not meta_obj['meta'].get('background'):
+                                    b2, _ = tmdb.pick_best_backdrop(movie_images_en)
+                                    if b2:
+                                        meta_obj['meta']['background'] = (tmdb.TMDB_BACK_URL + b2)
+                                if not meta_obj['meta'].get('logo'):
+                                    l2, _ = tmdb.pick_best_logo(movie_images_en)
+                                    if l2:
+                                        meta_obj['meta']['logo'] = (tmdb.TMDB_BACK_URL + l2)
                             print(f"[META][IMG] {imdb_id} chosen poster_lang={p_lang} backdrop_lang={b_lang}")
                             if movie_details.get('release_date'):
                                 meta_obj['meta']['released'] = to_iso_z(movie_details.get('release_date'))
@@ -590,9 +657,9 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
                                 meta['meta'].setdefault('behaviorHints', {})
                                 meta['meta']['behaviorHints']['hasScheduledVideos'] = True
                                 print(f"[META][UPCOMING][FLAG] hasScheduledVideos=True for {id} (anime)")
-                    # Fallback immagini per anime: se mancano poster/background, prova da Cinemeta (IMDb)
+                    # Fallback immagini per anime: se mancano poster/background/logo, prova da Cinemeta (IMDb)
                     try:
-                        if imdb_id and (not meta['meta'].get('poster') or not meta['meta'].get('background')):
+                        if imdb_id and (not meta['meta'].get('poster') or not meta['meta'].get('background') or not meta['meta'].get('logo')):
                             cm_resp = await client.get(f"{cinemeta_url}/meta/{type}/{imdb_id}.json")
                             if cm_resp.status_code == 200:
                                 cm = cm_resp.json()
@@ -602,6 +669,9 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
                                 if not meta['meta'].get('background') and (cm.get('meta') or {}).get('background'):
                                     meta['meta']['background'] = cm['meta']['background']
                                     print(f"[META][IMG][FALLBACK] Background from Cinemeta for {imdb_id}")
+                                if not meta['meta'].get('logo') and (cm.get('meta') or {}).get('logo'):
+                                    meta['meta']['logo'] = cm['meta']['logo']
+                                    print(f"[META][IMG][FALLBACK] Logo from Cinemeta for {imdb_id}")
                     except Exception:
                         pass
                 else:
@@ -616,12 +686,13 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
 
             meta['meta']['id'] = id
 
-            # Fallback immagini generale: se mancano poster/background, prova da Cinemeta
+            # Fallback immagini generale: se mancano poster/background/logo, prova da Cinemeta
             try:
                 imdb_for_cm = meta['meta'].get('imdb_id') or (id if id.startswith('tt') else None)
                 need_poster = not meta['meta'].get('poster')
                 need_bg = not meta['meta'].get('background')
-                if imdb_for_cm and (need_poster or need_bg):
+                need_logo = not meta['meta'].get('logo')
+                if imdb_for_cm and (need_poster or need_bg or need_logo):
                     cm_source = None
                     if 'cinemeta_meta' in locals() and cinemeta_meta:
                         cm_source = cinemeta_meta
@@ -636,6 +707,9 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
                         if need_bg and cm_source['meta'].get('background'):
                             meta['meta']['background'] = cm_source['meta']['background']
                             print(f"[META][IMG][FALLBACK] Background from Cinemeta for {imdb_for_cm}")
+                        if need_logo and cm_source['meta'].get('logo'):
+                            meta['meta']['logo'] = cm_source['meta']['logo']
+                            print(f"[META][IMG][FALLBACK] Logo from Cinemeta for {imdb_for_cm}")
             except Exception:
                 pass
 
