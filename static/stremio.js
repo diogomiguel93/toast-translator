@@ -27,7 +27,8 @@ async function stremioLogin() {
         document.getElementById("desc-head").style.display = "none";
         document.querySelector(".login-group").style.display = "none";
         document.querySelector(".add-group").style.display = "flex";
-        document.querySelector(".translate-button").style.display = "flex";
+    const tb = document.querySelector(".translate-button");
+    tb.classList.add('show');
         await stremioLoadAddons(response.result.authKey);
     }
 }
