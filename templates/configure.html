@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Toast Translator</title>
     <link rel="stylesheet" href="/static/style.css">
+    <!-- Local neon theme / external catalogs styles -->
+    <link rel="stylesheet" href="test.css">
     <script src="/static/stremio.js"></script>
     <script src="/static/addonCard.js"></script>
     <script src="/static/installer.js"></script>
@@ -40,6 +42,17 @@
         <div class="translate-button" hidden="true">
             <button onclick="translateSelected(stremioUser.result.authKey, transteArray)">Applica</button>
             <button onclick="reloadAddons(stremioUser.result.authKey)">Ricarica Addons</button>
+        </div>
+
+        <!-- Cataloghi / Servizi Consigliati -->
+        <div class="external-catalogs" id="cataloghi-consigliati">
+            <h4>Cataloghi Consigliati</h4>
+            <div class="ext-links-row">
+                <a class="ext-link" href="stremio://v3-cinemeta.strem.io/manifest.json"><span>Cinemeta</span></a>
+                <a class="ext-link" href="stremio://anime-kitsu.strem.fun/manifest.json"><span>Kitsu</span></a>
+                <a class="ext-link" href="https://1fe84bc728af-stremio-anime-catalogs.baby-beamup.club/configure" target="_blank" rel="noopener"><span>AnimeCatalog</span></a>
+                <a class="ext-link" href="https://trakt.dexter21767.com/configure/" target="_blank" rel="noopener"><span>Trakt</span></a>
+            </div>
         </div>
     </div>
 
