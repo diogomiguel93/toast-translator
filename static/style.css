@@ -57,7 +57,7 @@ body {
     text-shadow: 0 0 10px rgba(255,0,255,0.8), 0 0 30px rgba(0,255,240,0.5);
 }
 .title .toast { color: var(--neon-cyan); filter: drop-shadow(0 0 6px rgba(0,255,240,0.8)); }
-.title .translator { color: var(--neon-pink); filter: drop-shadow(0 0 6px rgba(255,0,255,0.8)); }
+.title .translator { color: var(--neon-purple); filter: drop-shadow(0 0 6px rgb(225, 0, 255)); }
 
 .description {
     color: var(--muted);
@@ -186,4 +186,25 @@ textarea[readonly] { pointer-events: none; }
     to { transform: translateY(-20px) translateX(30px); }
 }
 
+/* ===== External Catalog Quick Links (Cinemeta / Kitsu / AnimeCatalog / Trakt) ===== */
+:root { --neon-red: #ff2e2e; }
+@keyframes redPulse { 0% { box-shadow: 0 0 0 0 rgba(255,46,46,0.55);} 70% { box-shadow: 0 0 0 14px rgba(255,46,46,0);} 100% { box-shadow: 0 0 0 0 rgba(255,46,46,0);} }
+.external-catalogs { text-align:center; margin-top: 26px; }
+.external-catalogs h4 { margin:0 0 6px 0; font-weight:600; letter-spacing:1px; font-size:13px; text-transform:uppercase; color: var(--muted); }
+.ext-links-row { display:flex; flex-wrap:wrap; gap:12px; justify-content:center; }
+.ext-link { 
+    background: linear-gradient(135deg,#400000,#780909 55%,#400000);
+    color:#fff; text-decoration:none; padding:10px 16px; border-radius:12px; font-size:12px; font-weight:600; letter-spacing:0.5px;
+    border:1px solid rgba(255,46,46,0.55);
+    box-shadow:0 0 6px rgba(255,46,46,0.55), inset 0 0 8px rgba(255,46,46,0.35);
+    animation:redPulse 2.1s ease-in-out infinite;
+    display:inline-flex; align-items:center; justify-content:center; position:relative; overflow:hidden;
+    transition:transform .25s ease, box-shadow .25s ease, background .35s ease;
+}
+.ext-link::after { content:""; position:absolute; inset:0; background:linear-gradient(120deg,rgba(255,255,255,0.08),rgba(255,255,255,0)); opacity:0; transition:opacity .35s ease; }
+.ext-link:hover { transform:translateY(-3px) scale(1.05); box-shadow:0 0 12px rgba(255,46,46,0.75), 0 0 24px rgba(255,46,46,0.35), inset 0 0 10px rgba(255,46,46,0.45); }
+.ext-link:hover::after { opacity:1; }
+.ext-link:active { transform:translateY(0) scale(.96); }
+.ext-link span { background:linear-gradient(90deg,#ffb3b3,#ffe0e0); -webkit-background-clip:text; background-clip:text; color:#fff; filter:drop-shadow(0 0 4px rgba(255,46,46,0.65)); }
+@media (max-width:600px){ .ext-link { flex:1 1 calc(50% - 12px); text-align:center; } }
 
