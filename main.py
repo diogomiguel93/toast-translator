@@ -178,6 +178,41 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
     settings = parse_user_settings(user_settings)
     global tmdb_addon_meta_url
     async with httpx.AsyncClient(follow_redirects=True, timeout=REQUEST_TIMEOUT) as client:
+        # Helpers Cinemeta (scope get_meta)
+        async def _fetch_cinemeta_any(imdb_id: str):
+            if not imdb_id or not imdb_id.startswith('tt'):
+                return {}
+            order = []
+            if type in ('movie','series'):
+                order.append(type)
+            for t in ['series','movie']:
+                if t not in order:
+                    order.append(t)
+            for t in order:
+                try:
+                    r = await client.get(f"{cinemeta_url}/meta/{t}/{imdb_id}.json")
+                    if r.status_code == 200:
+                        j = r.json()
+                        if j.get('meta'):
+                            return j
+                except Exception:
+                    pass
+            return {}
+
+        def _apply_cinemeta_fields(meta_obj: dict, cm: dict):
+            try:
+                m = (meta_obj or {}).get('meta') or {}
+                src = (cm or {}).get('meta') or {}
+                if not src:
+                    return
+                for k in ('runtime','releaseInfo','imdbRating','cast'):
+                    if not m.get(k):
+                        v = src.get(k)
+                        if v:
+                            m[k] = v
+                meta_obj['meta'] = m
+            except Exception:
+                pass
 
         # Get from cache
         meta = meta_cache.get(id)
@@ -388,6 +423,9 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
                     if id not in kitsu.imdb_ids_map:
                         tasks = []
                         meta, merged_videos = meta_merger.merge(tmdb_meta, cinemeta_meta)
+                        # Enrichment IMDb (movie/series)
+                        if cinemeta_meta.get('meta'):
+                            _apply_cinemeta_fields(meta, cinemeta_meta)
                         # Log sorgente poster/background
                         try:
                             tmdb_has_poster = bool(tmdb_meta.get('meta', {}).get('poster'))
@@ -435,6 +473,9 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
                                 print(f"[META][IMG][FALLBACK] Logo from Cinemeta for {id}")
                         except Exception:
                             pass
+                        # Enrichment anime IMDb (cast/rating/runtime/releaseInfo)
+                        if cinemeta_meta.get('meta'):
+                            _apply_cinemeta_fields(meta, cinemeta_meta)
 
                 # Empty tmdb_data
                 else:
@@ -657,6 +698,13 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
                                 meta['meta'].setdefault('behaviorHints', {})
                                 meta['meta']['behaviorHints']['hasScheduledVideos'] = True
                                 print(f"[META][UPCOMING][FLAG] hasScheduledVideos=True for {id} (anime)")
+                        # Enrichment anime (kitsu/mal) via Cinemeta (multi-try)
+                        try:
+                            cm_any = await _fetch_cinemeta_any(imdb_id)
+                            if cm_any.get('meta'):
+                                _apply_cinemeta_fields(meta, cm_any)
+                        except Exception:
+                            pass
                     # Fallback immagini per anime: se mancano poster/background/logo, prova da Cinemeta (IMDb)
                     try:
                         if imdb_id and (not meta['meta'].get('poster') or not meta['meta'].get('background') or not meta['meta'].get('logo')):
@@ -685,6 +733,18 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
 
 
             meta['meta']['id'] = id
+
+            # Enrichment finale (se ancora mancano campi)
+            try:
+                imdb_final = meta['meta'].get('imdb_id') or (id if id.startswith('tt') else None)
+                if imdb_final:
+                    needed = [k for k in ('runtime','releaseInfo','imdbRating','cast') if not meta['meta'].get(k)]
+                    if needed:
+                        cm_final = await _fetch_cinemeta_any(imdb_final)
+                        if cm_final.get('meta'):
+                            _apply_cinemeta_fields(meta, cm_final)
+            except Exception:
+                pass
 
             # Fallback immagini generale: se mancano poster/background/logo, prova da Cinemeta
             try:
