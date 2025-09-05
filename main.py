@@ -703,6 +703,13 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
                             cm_any = await _fetch_cinemeta_any(imdb_id)
                             if cm_any.get('meta'):
                                 _apply_cinemeta_fields(meta, cm_any)
+                                # Genres only for kitsu/mal (non IMDb direct) requested
+                                try:
+                                    if not meta['meta'].get('genres') and (cm_any.get('meta') or {}).get('genres'):
+                                        meta['meta']['genres'] = cm_any['meta']['genres']
+                                        print(f"[META][ENRICH][GENRES] Added genres from Cinemeta for {id}")
+                                except Exception:
+                                    pass
                         except Exception:
                             pass
                     # Fallback immagini per anime: se mancano poster/background/logo, prova da Cinemeta (IMDb)
