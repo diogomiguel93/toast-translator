@@ -154,7 +154,7 @@ async def get_manifest(addon_url, user_settings):
     addon_url = decode_base64_url(addon_url)
     user_settings = parse_user_settings(user_settings)
     async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
-        response = await client.get(f"{addon_url}/manifest.json")
+        response = await client.get(f"{addon_url}/manifest.json", headers=stremio_headers)
         manifest = response.json()
 
     is_translated = manifest.get('translated', False)
@@ -206,7 +206,7 @@ async def get_catalog(response: Response, addon_url, type: str, user_settings: s
     addon_url = decode_base64_url(addon_url)
 
     async with httpx.AsyncClient(follow_redirects=True, timeout=REQUEST_TIMEOUT) as client:
-        response = await client.get(f"{addon_url}/catalog/{type}/{path}")
+        response = await client.get(f"{addon_url}/catalog/{type}/{path}", headers=stremio_headers)
 
         # Cinemeta last-videos and calendar
         if 'last-videos' in path or 'calendar-videos' in path:
@@ -424,7 +424,7 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
                 meta, placeholder = await meta_builder.build_metadata(id, type, language, tmdb_key)
             # Not compatible id
             else:
-                response = await client.get(f"{addon_url}/meta/{type}/{id}.json")
+                response = await client.get(f"{addon_url}/meta/{type}/{id}.json", headers=stremio_headers)
                 return JSONResponse(content=response.json(), headers=cloudflare_cache_headers)
 
 
@@ -438,7 +438,7 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
 async def get_addon_catalog(addon_url, path: str):
     addon_url = decode_base64_url(addon_url)
     async with httpx.AsyncClient(follow_redirects=True, timeout=REQUEST_TIMEOUT) as client:
-        response = await client.get(f"{addon_url}/addon_catalog/{path}")
+        response = await client.get(f"{addon_url}/addon_catalog/{path}", stremio_headers)
         return JSONResponse(content=response.json(), headers=cloudflare_cache_headers)
 
 # Subs redirect
