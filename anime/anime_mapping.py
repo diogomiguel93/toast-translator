@@ -78,7 +78,8 @@ def load_imdb_map() -> dict:
 
     for item in raw_map:
 
-        imdb_id: str | None = item.get('imdb_id')
+        value = item.get("imdb_id")
+        imdb_id: str | None = value[0] if isinstance(value, list) and value else value
 
         if imdb_id != None:
             kitsu_id: str | None = item.get('kitsu_id')
