@@ -29,6 +29,11 @@ async def download_maps():
         results = await asyncio.gather(*tasks)
         anime_id_map = results[0].json() + anime_mapping_extension
         anime_season_map = {**results[1].json(), **anidb_extension}
+
+        # Fribb list now stores imdb_id as a list: keep the first one, as load_imdb_map does
+        for item in anime_id_map:
+            if isinstance(item.get('imdb_id'), list):
+                item['imdb_id'] = item['imdb_id'][0] if item['imdb_id'] else None
         
 
 def load_kitsu_map() -> dict:
