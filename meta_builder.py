@@ -21,7 +21,7 @@ with open("anime/tmdb_exceptions.json", "r", encoding="utf-8") as f:
 async def build_metadata(imdb_id: str, type: str, language: str, tmdb_key: str):
     tmdb_id = None
     if 'tt' in imdb_id:
-        tmdb_id = await tmdb.convert_imdb_to_tmdb(imdb_id, language, tmdb_key)
+        tmdb_id = await tmdb.convert_imdb_to_tmdb(imdb_id, language, tmdb_key, type)
     if 'tmdb:' in imdb_id: 
         tmdb_id = imdb_id.replace('tmdb:', '')
     elif tmdb_id != None and 'tmdb:' in tmdb_id:

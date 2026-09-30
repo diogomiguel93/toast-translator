@@ -259,8 +259,9 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
 
     async with httpx.AsyncClient(follow_redirects=True, timeout=REQUEST_TIMEOUT) as client:
 
-        # Get from cache
-        meta = meta_cache[language].get(id)
+        # Get from cache (keyed by type: same imdb id requested as movie and series must not collide)
+        cache_key = f"{type}:{id}"
+        meta = meta_cache[language].get(cache_key)
 
         # Return cached meta
         if meta != None:
@@ -428,7 +429,7 @@ async def get_meta(request: Request,response: Response, addon_url, user_settings
 
 
             meta['meta']['id'] = id
-            meta_cache[language].set(id, meta)
+            meta_cache[language].set(cache_key, meta)
             return JSONResponse(content=meta, headers=cloudflare_cache_headers)
 
 

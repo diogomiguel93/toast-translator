@@ -124,22 +124,24 @@ async def get_season_details(client: httpx.AsyncClient, season_id: str, season_n
     return await fetch_and_retry(client, season_id, url, language, params)
 
 # Converting imdb id to tmdb id
-async def convert_imdb_to_tmdb(imdb_id: str, language: str, api_key: str) -> str:
+async def convert_imdb_to_tmdb(imdb_id: str, language: str, api_key: str, type: str = None) -> str:
 
     tmdb_data = tmp_cache[language].get(imdb_id)
 
     if tmdb_data != None:
-        return get_id(tmdb_data)
+        return get_id(tmdb_data, type)
     else:
         async with httpx.AsyncClient(timeout=20) as client:
             tmdb_data = await get_tmdb_data(client, imdb_id, 'imdb_id', language, api_key)
-            return get_id(tmdb_data)
-        
+            return get_id(tmdb_data, type)
 
-# Search and parse id
-def get_id(tmdb_data: dict) -> str:
+
+# Search and parse id (only in the results matching the requested type: movie and tv ids overlap on TMDB)
+def get_id(tmdb_data: dict, type: str = None) -> str:
+    key = {'movie': 'movie_results', 'series': 'tv_results'}.get(type)
+    results = [tmdb_data.get(key)] if key else tmdb_data.values()
     try:
-        id = next((v[0]["id"] for v in tmdb_data.values() if v), None)
+        id = next((v[0]["id"] for v in results if v), None)
     except:
         return tmdb_data['imdb_id']
     else:
