@@ -207,7 +207,11 @@ async def series_build_episodes(client: httpx.AsyncClient, imdb_id: str, tmdb_id
 
 
 def convert_minutes_hours(value):
-    total_minutes = int(str(value).replace("min", "").strip())
+    # Unknown runtime (e.g. upcoming series: 'N/A min', movie runtime None)
+    try:
+        total_minutes = int(str(value).replace("min", "").strip())
+    except ValueError:
+        return ''
     
     if total_minutes < 60:
         return f"{total_minutes}min"
