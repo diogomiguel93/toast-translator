@@ -21,7 +21,7 @@ with open("anime/tmdb_exceptions.json", "r", encoding="utf-8") as f:
 async def build_metadata(imdb_id: str, type: str, language: str, tmdb_key: str):
     tmdb_id = None
     if 'tt' in imdb_id:
-        tmdb_id = await tmdb.convert_imdb_to_tmdb(imdb_id, language, tmdb_key)
+        tmdb_id = await tmdb.convert_imdb_to_tmdb(imdb_id, language, tmdb_key, type)
     if 'tmdb:' in imdb_id: 
         tmdb_id = imdb_id.replace('tmdb:', '')
     elif tmdb_id != None and 'tmdb:' in tmdb_id:
@@ -207,7 +207,11 @@ async def series_build_episodes(client: httpx.AsyncClient, imdb_id: str, tmdb_id
 
 
 def convert_minutes_hours(value):
-    total_minutes = int(str(value).replace("min", "").strip())
+    # Unknown runtime (e.g. upcoming series: 'N/A min', movie runtime None)
+    try:
+        total_minutes = int(str(value).replace("min", "").strip())
+    except ValueError:
+        return ''
     
     if total_minutes < 60:
         return f"{total_minutes}min"

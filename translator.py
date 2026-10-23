@@ -35,22 +35,32 @@ def get_cache_lenght():
 
 # Poster ratings
 RATINGS_SERVER = os.getenv('TR_SERVER', 'https://ca6771aaa821-toast-ratings.baby-beamup.club')
+# Lingva instance for machine translation; set it empty to disable (original text is kept)
+LINGVA_URL = os.getenv('LINGVA_URL', 'https://lingva-translate-azure.vercel.app')
 
 
 
 async def translate_with_api(client: httpx.AsyncClient, text: str, language: str, source='en') -> str:
 
+    # An empty cached value is a past failure: retry it
     translation = translations_cache[language].get(text)
-    target = language.split('-')[0]
-    if translation == None and text != None and text != '':
-        api_url = f"https://lingva-translate-azure.vercel.app/api/v1/{source}/{target}/{urllib.parse.quote(text)}"
+    if translation:
+        return translation
+    if not text or not LINGVA_URL:
+        return text
 
+    target = language.split('-')[0]
+    api_url = f"{LINGVA_URL}/api/v1/{source}/{target}/{urllib.parse.quote(text)}"
+    try:
         response = await client.get(api_url)
         translated_text = response.json().get('translation', '')
-        translations_cache[language].set(text, translated_text)
-    else:
-        translated_text = translation
+    except Exception:
+        translated_text = ''
 
+    # Translation service down: keep the original text, don't cache the failure
+    if not translated_text:
+        return text
+    translations_cache[language].set(text, translated_text)
     return translated_text
 
 
